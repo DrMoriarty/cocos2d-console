@@ -190,6 +190,7 @@ class Project(object):
         return self._project_lang == Project.JS
 
 class Platforms(object):
+    AMAZON = 'amazon'
     ANDROID = 'android'
     IOS = 'ios'
     MAC = 'mac'
@@ -200,6 +201,7 @@ class Platforms(object):
     TIZEN = "tizen"
 
     CFG_CLASS_MAP = {
+        AMAZON : "cocos_project.AmazonConfig",
         ANDROID : "cocos_project.AndroidConfig",
         IOS : "cocos_project.iOSConfig",
         MAC : "cocos_project.MacConfig",
@@ -237,9 +239,9 @@ class Platforms(object):
     def _filter_platforms(self, platforms):
         ret = []
         platforms_for_os = {
-            "linux" : [ Platforms.WEB, Platforms.LINUX, Platforms.ANDROID, Platforms.TIZEN ],
-            "mac" : [ Platforms.WEB, Platforms.IOS, Platforms.MAC, Platforms.ANDROID, Platforms.TIZEN ],
-            "win32" : [ Platforms.WEB, Platforms.WIN32, Platforms.ANDROID,
+            "linux" : [ Platforms.WEB, Platforms.LINUX, Platforms.ANDROID, Platforms.AMAZON, Platforms.TIZEN ],
+            "mac" : [ Platforms.WEB, Platforms.IOS, Platforms.MAC, Platforms.ANDROID, Platforms.AMAZON, Platforms.TIZEN ],
+            "win32" : [ Platforms.WEB, Platforms.WIN32, Platforms.ANDROID, Platforms.AMAZON,
                         Platforms.METRO, Platforms.TIZEN ]
         }
         for p in platforms:
@@ -259,7 +261,7 @@ class Platforms(object):
         # generate the platform list for different projects
         if self._project._is_lua_project():
             if self._project._is_native_support():
-                platform_list = [ Platforms.ANDROID, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.LINUX, Platforms.TIZEN ]
+                platform_list = [ Platforms.ANDROID, Platforms.AMAZON, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.LINUX, Platforms.TIZEN ]
             else:
                 if self._project.has_android_libs():
                     platform_list = [ Platforms.ANDROID ]
@@ -267,14 +269,14 @@ class Platforms(object):
                     platform_list = []
         elif self._project._is_js_project():
             if self._project._is_native_support():
-                platform_list = [ Platforms.ANDROID, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.WEB, Platforms.LINUX, Platforms.METRO, Platforms.TIZEN ]
+                platform_list = [ Platforms.ANDROID, Platforms.AMAZON, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.WEB, Platforms.LINUX, Platforms.METRO, Platforms.TIZEN ]
             else:
                 if self._project.has_android_libs():
                     platform_list = [ Platforms.ANDROID, Platforms.WEB ]
                 else:
                     platform_list = [ Platforms.WEB ]
         elif self._project._is_cpp_project():
-            platform_list = [ Platforms.ANDROID, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.LINUX, Platforms.METRO, Platforms.TIZEN ]
+            platform_list = [ Platforms.ANDROID, Platforms.AMAZON, Platforms.WIN32, Platforms.IOS, Platforms.MAC, Platforms.LINUX, Platforms.METRO, Platforms.TIZEN ]
 
         # filter the available platform list
         platform_list = self._filter_platforms(platform_list)
@@ -312,6 +314,9 @@ class Platforms(object):
 
     def none_active(self):
         return self._current is None
+
+    def is_amazon_active(self):
+        return self._current == Platforms.AMAZON
 
     def is_android_active(self):
         return self._current == Platforms.ANDROID
@@ -387,6 +392,21 @@ class PlatformConfig(object):
             ret = False
 
         return ret
+
+class AmazonConfig(PlatformConfig):
+
+    def _use_default(self):
+        if self._is_script:
+            self.proj_path = os.path.join(self._proj_root_path, "frameworks", "runtime-src", "proj.amazon")
+        else:
+            self.proj_path = os.path.join(self._proj_root_path, "proj.amazon")
+
+    def _parse_info(self, cfg_info):
+        super(AmazonConfig, self)._parse_info(cfg_info)
+
+    def _is_available(self):
+        proj_amazon_existed = super(AmazonConfig, self)._is_available()
+        return proj_amazon_existed
 
 class AndroidConfig(PlatformConfig):
     KEY_STUDIO_PATH = "studio_proj_path"

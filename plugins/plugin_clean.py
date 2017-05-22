@@ -32,7 +32,7 @@ class CCPluginClean(cocos2d.CCPlugin):
         return "removes files produced by compilation"
 
     def clean_android(self):
-        if not self._platforms.is_android_active():
+        if not self._platforms.is_android_active() or not self._platforms.is_amazon_active():
             return
         project_dir = self._platforms.project_path()
 

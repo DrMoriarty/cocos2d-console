@@ -51,7 +51,7 @@ class LibsCompiler(cocos.CCPlugin):
         parser.add_argument('-c', dest='clean', action="store_true",
                             help=MultiLanguage.get_string('GEN_LIBS_ARG_CLEAN'))
         parser.add_argument('-e', dest='engine_path', help=MultiLanguage.get_string('GEN_LIBS_ARG_ENGINE'))
-        parser.add_argument('-p', dest='platform', action="append", choices=['ios', 'mac', 'android', 'win32'],
+        parser.add_argument('-p', dest='platform', action="append", choices=['ios', 'mac', 'android', 'win32', 'amazon'],
                             help=MultiLanguage.get_string('GEN_LIBS_ARG_PLATFORM'))
         parser.add_argument('-m', "--mode", dest='compile_mode', default='release', choices=['debug', 'release'],
                             help=MultiLanguage.get_string('GEN_LIBS_ARG_MODE'))
@@ -122,6 +122,8 @@ class LibsCompiler(cocos.CCPlugin):
             if 'mac' in args.platform:
                 self.build_mac = True
             if 'android' in args.platform:
+                self.build_android = True
+	    if 'amazon' in args.platform:
                 self.build_android = True
 
         self.disable_strip = args.disable_strip

@@ -256,7 +256,7 @@ class CCPluginCompile(cocos.CCPlugin):
             "output-dir": self._output_dir
         }
 
-        if self._platforms.is_android_active():
+        if self._platforms.is_android_active() or self._platforms.is_amazon_active():
             self._custom_step_args["ndk-build-mode"] = self._ndk_mode
 
     def _build_cfg_path(self):
@@ -288,6 +288,10 @@ class CCPluginCompile(cocos.CCPlugin):
             from build_android import AndroidBuilder
             key_of_copy = AndroidBuilder.CFG_KEY_COPY_TO_ASSETS
             key_of_must_copy = AndroidBuilder.CFG_KEY_MUST_COPY_TO_ASSERTS
+	elif self._platforms.is_amazon_active():
+            from build_amazon import AmazonBuilder
+            key_of_copy = AmazonBuilder.CFG_KEY_COPY_TO_ASSETS
+            key_of_must_copy = AmazonBuilder.CFG_KEY_MUST_COPY_TO_ASSERTS
         elif self._platforms.is_win32_active():
             key_of_copy = CCPluginCompile.CFG_KEY_WIN32_COPY_FILES
             key_of_must_copy = CCPluginCompile.CFG_KEY_WIN32_MUST_COPY_FILES
@@ -582,6 +586,104 @@ class CCPluginCompile(cocos.CCPlugin):
         self.android_package, self.android_activity = builder.get_apk_info()
 
         cocos.Logging.info(MultiLanguage.get_string('COMPILE_INFO_BUILD_SUCCEED'))
+
+    def build_amazon(self):
+        if not self._platforms.is_amazon_active():
+            return
+
+        project_dir = self._project.get_project_dir()
+        build_mode = self._mode
+        output_dir = self._output_dir
+
+        # get the amazon project path
+        cfg_obj = self._platforms.get_current_config()
+        project_amazon_dir = cfg_obj.proj_path
+
+        ide_name = 'Android Studio'
+        cocos.Logging.info(MultiLanguage.get_string('COMPILE_INFO_ANDROID_PROJPATH_FMT', (ide_name, project_amazon_dir)))
+
+        # Check whether the gradle of the project is support ndk or not
+        gradle_support_ndk = False
+        # Get the engine version of the project
+        engine_version_num = self.get_engine_version_num()
+        if engine_version_num is None:
+            raise cocos.CCPluginError(MultiLanguage.get_string('COMPILE_ERROR_UNKNOWN_ENGINE_VERSION'))
+
+        # Gradle supports NDK build from engine 3.15
+        main_ver = engine_version_num[0]
+        minor_ver = engine_version_num[1]
+        if main_ver > 3 or (main_ver == 3 and minor_ver >= 15):
+            gradle_support_ndk = True
+
+        from build_amazon import AmazonBuilder
+        builder = AmazonBuilder(self._verbose, project_amazon_dir,
+                                 self._no_res, self._project, self._ndk_mode,
+                                 self.app_abi, gradle_support_ndk)
+
+        args_ndk_copy = self._custom_step_args.copy()
+        target_platform = self._platforms.get_current_platform()
+
+        # update the project with the android platform
+        builder.update_project(self._ap)
+
+        if not self._project._is_script_project() or self._project._is_native_support():
+            if self._ndk_mode != "none" and not gradle_support_ndk:
+                # build native code
+                cocos.Logging.info(MultiLanguage.get_string('COMPILE_INFO_BUILD_NATIVE'))
+                ndk_build_param = [
+                    "-j%s" % self._jobs
+                ]
+
+                if self.app_abi:
+                    abi_param = "APP_ABI=\"%s\"" % self.app_abi
+                    ndk_build_param.append(abi_param)
+
+                if self.ndk_toolchain:
+                    toolchain_param = "NDK_TOOLCHAIN=%s" % self.ndk_toolchain
+                    ndk_build_param.append(toolchain_param)
+
+                self._project.invoke_custom_step_script(cocos_project.Project.CUSTOM_STEP_PRE_NDK_BUILD, target_platform, args_ndk_copy)
+
+                modify_mk = False
+                app_mk = os.path.join(project_amazon_dir, "app/jni/Application.mk")
+                mk_content = None
+                if self.cppflags and os.path.exists(app_mk):
+                    # record the content of Application.mk
+                    f = open(app_mk)
+                    mk_content = f.read()
+                    f.close()
+
+                    # Add cpp flags
+                    f = open(app_mk, "a")
+                    f.write("\nAPP_CPPFLAGS += %s" % self.cppflags)
+                    f.close()
+                    modify_mk = True
+
+                try:
+                    builder.do_ndk_build(ndk_build_param, self._ndk_mode, self)
+                except Exception as e:
+                    if e.__class__.__name__ == 'CCPluginError':
+                        raise e
+                    else:
+                        raise cocos.CCPluginError(MultiLanguage.get_string('COMPILE_ERROR_NDK_BUILD_FAILED'),
+                                                  cocos.CCPluginError.ERROR_BUILD_FAILED)
+                finally:
+                    # roll-back the Application.mk
+                    if modify_mk:
+                        f = open(app_mk, "w")
+                        f.write(mk_content)
+                        f.close()
+
+                self._project.invoke_custom_step_script(cocos_project.Project.CUSTOM_STEP_POST_NDK_BUILD, target_platform, args_ndk_copy)
+
+        # build apk
+        if not self._no_apk:
+            cocos.Logging.info(MultiLanguage.get_string('COMPILE_INFO_BUILD_APK'))
+        self.apk_path = builder.do_build_apk(build_mode, self._no_apk, output_dir, self._custom_step_args, self._ap, self)
+        self.android_package, self.android_activity = builder.get_apk_info()
+
+        cocos.Logging.info(MultiLanguage.get_string('COMPILE_INFO_BUILD_SUCCEED'))
+
 
     def check_ios_mac_build_depends(self):
         version = cocos.get_xcode_version()
@@ -1600,6 +1702,7 @@ class CCPluginCompile(cocos.CCPlugin):
         self._project.invoke_custom_step_script(cocos_project.Project.CUSTOM_STEP_PRE_BUILD, target_platform, args_build_copy)
 
         self.build_android()
+	self.build_amazon()
         self.build_ios()
         self.build_mac()
         self.build_win32()

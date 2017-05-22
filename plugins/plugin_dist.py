@@ -50,6 +50,13 @@ class CCPluginDist(cocos2d.CCPlugin):
 
         raise cocos2d.CCPluginError("unimplemented")
 
+    def dist_amazon(self):
+        if not self._platforms.is_amazon_active():
+            return
+        project_dir = self._platforms.project_path()
+
+        raise cocos2d.CCPluginError("unimplemented")
+
     def _find_ios_scheme(self, project_dir):
         out = self._output_for("cd \"%s\" && xcodebuild -list" % project_dir)
 
@@ -91,4 +98,5 @@ class CCPluginDist(cocos2d.CCPlugin):
     def run(self, argv, dependencies):
         self.parse_args(argv)
         self.dist_android()
+        self.dist_amazon()
         self.dist_ios()
